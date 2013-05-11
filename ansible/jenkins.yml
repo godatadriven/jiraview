@@ -1,0 +1,13 @@
+---
+- hosts: jiraview
+  user: root
+  tasks:
+    - name: Configure Jenkins yum rpo
+      get_url: url=http://pkg.jenkins-ci.org/redhat/jenkins.repo dest=/etc/yum.repos.d/jenkins.repo force=no owner=root group=root
+    - name: Add GPG key location to jenkins repo
+      lineinfile: dest=/etc/yum.repos.d/jenkins.repo regexp="^gpgkey = " line="gpgkey = http://pkg.jenkins-ci.org/redhat/jenkins-ci.org.key"
+
+    - name: Install Jenkins
+      yum: name=jenkins state=installed
+    - name: Jenkins service
+      service: name=jenkins state=started enabled=yes

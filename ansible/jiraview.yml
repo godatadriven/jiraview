@@ -1,0 +1,6 @@
+- include: epel.yml
+- include: devtools.yml
+- include: java.yml
+- include: python27.yml
+- include: R.yml
+- include: jenkins.yml

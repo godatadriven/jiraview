@@ -1,0 +1,6 @@
+---
+- hosts: jiraview
+  user: root
+  tasks:
+    - name: Configure EPEL
+      copy: src=files/epel.repo dest=/etc/yum.repos.d/ owner=root group=root

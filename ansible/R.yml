@@ -1,0 +1,17 @@
+---
+- hosts: jiraview
+  user: root
+  vars:
+    cran_mirror: http://cran-mirror.cs.uu.nl/
+  tasks:
+    #Requires EPEL
+    - name: Install R language
+    # WATCH OUT! Specifically install R-core and R-core-devel. Installing R and R-devel installs R-java which depends on (and thus installs) open JDK.
+      yum: name=R-core,R-core-devel state=installed
+    - name: Install R packages
+      shell: R -e 'install.packages("${item}", repos = "${cran_mirror}")' creates=/usr/lib64/R/library/${item}/INDEX
+      with_items:
+        - ggplot2
+        - zoo
+        - reshape2
+        - outliers

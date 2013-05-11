@@ -1,0 +1,9 @@
+---
+- hosts: jiraview
+  user: root
+  tasks:
+    - name: Configure Cloudera CM4 repo (for JDK)
+      get_url: url=http://archive.cloudera.com/cm4/redhat/6/x86_64/cm/cloudera-manager.repo dest=/etc/yum.repos.d/cloudera-manager.repo force=no owner=root group=root
+
+    - name: Install JDK from CM4 repo
+      yum: name=jdk state=installed
