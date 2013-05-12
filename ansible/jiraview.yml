@@ -4,3 +4,4 @@
 - include: python27.yml
 - include: R.yml
 - include: jenkins.yml
+- include: mongo.yml

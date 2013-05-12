@@ -1,0 +1,8 @@
+---
+- hosts: jiraview
+  user: root
+  tasks:
+    - name: Install MongoDB
+      yum: name=mongodb,mongodb-server state=installed
+    - name: mongod service
+      service: name=mongod state=started enabled=yes
