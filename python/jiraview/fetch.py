@@ -56,7 +56,7 @@ def fetch_and_save_issues(issues, collection, user = None, password = None, verb
         else:
             issue_request = requests.get(link['self'], params = params)
 
-        log(verbose, 'Requesting %s.' % link['self'])
+        log(verbose, '[%d / %d] Requesting %s.' % (count + 1, len(issues), link['self']))
 
         result = issue_request.json()
         result['_id'] = result['key']

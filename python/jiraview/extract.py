@@ -11,7 +11,7 @@ client = MongoClient()
 
 as_is_fields = {
     'key': 'key',
-    'summary' : 'fields.summary',
+    # 'summary' : 'fields.summary', # PROBLEMATIC IN CSV! Will contain new lines and such.
     'issue_type' : 'fields.issuetype.name',
     'vote_count' : 'fields.votes.votes',
     'resolution' : 'fields.resolution.name',
@@ -62,14 +62,16 @@ def add_transitions_to_issues(issues):
             'who' : retrieve_dotnotation_field(issue, 'fields.reporter.name'),
             'from_status' : None,
             'to_status' : 'Open',
-            'days_in_from_status' : None
+            'days_in_from_status' : None,
+            'days_since_open' : None
         }] + [{
             'transition' : '%s to %s' % (retrieve_dotnotation_field(line, 'status_item.fromString'), retrieve_dotnotation_field(line, 'status_item.toString')),
             'when' : retrieve_dotnotation_field(line, 'created'),
             'who' : retrieve_dotnotation_field(line, 'author.name'),
             'from_status' : retrieve_dotnotation_field(line, 'status_item.fromString'),
             'to_status' : retrieve_dotnotation_field(line, 'status_item.toString'),
-        }]
+            'days_since_open' : (parse_iso(retrieve_dotnotation_field(line, 'created')) - parse_iso(retrieve_dotnotation_field(issue, 'fields.created'))).total_seconds() / (24 * 3600)
+        } for line in workflow_log]
 
         # Calculate days between transitions
         for idx in xrange(1, len(transitions)):
@@ -105,11 +107,16 @@ def write_transitions(basename, dir, issues):
         return
 
     with codecs.open(os.path.join(dir, basename + '-transitions.csv'), 'w', 'utf-8') as csv_file:
-        writer = csv.DictWriter(csv_file, issues[0]['__transitions'][0].keys(), restval = 'NA', dialect = 'excel')
+        row = issue_fields(issues[0])
+        row.update(issues[0]['__transitions'][0])
+
+        writer = csv.DictWriter(csv_file, row.keys(), restval = 'NA', dialect = 'excel')
         writer.writeheader()
         for issue in issues:
+            row = issue_fields(issue)
             for transition in issue['__transitions']:
-                writer.writerow(transition)
+                row.update(transition)
+                writer.writerow(row)
 
 def parse_args():
     parser = argparse.ArgumentParser(description = 'Create CSV files for issues from a dataset.')
