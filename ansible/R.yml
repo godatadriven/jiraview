@@ -15,3 +15,4 @@
         - zoo
         - reshape2
         - outliers
+        - optparse
