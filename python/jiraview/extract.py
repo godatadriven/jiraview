@@ -118,6 +118,54 @@ def write_transitions(basename, dir, issues):
                 row.update(transition)
                 writer.writerow(row)
 
+def all_transitions_and_known_statuses(issues):
+    known_statuses = set()
+    transitions = []
+    for issue in issues:
+        transitions.extend(issue['__transitions'])
+
+    for transition in transitions:
+        known_statuses.add(transition['from_status'])
+        known_statuses.add(transition['to_status'])
+
+    transitions.sort(key = lambda x: x['when'])
+
+    return (transitions, known_statuses)
+
+def write_issue_counts(basename, dir, issues):
+    if len(issues) == 0:
+        return
+
+    with codecs.open(os.path.join(dir, basename + '-daycounts.csv'), 'w', 'utf-8') as csv_file:
+        writer = csv.DictWriter(csv_file, ['day', 'status', 'count'], restval = 'NA', dialect = 'excel')
+        writer.writeheader()
+
+        #TODO: prettify imperative garble, probably want to create a generator for the days
+        transitions, known_statuses = all_transitions_and_known_statuses(issues)
+
+        issue_counts = { s : 0 for s in known_statuses }
+
+        one_day = datetime.timedelta(days = 1)
+        day = parse_iso(transitions[0]['when'])
+        itr = iter(transitions)
+        line = itr.next()
+        while day <= parse_iso(transitions[-1]['when']):
+            while parse_iso(line['when']) < day:
+                issue_counts[line['from_status']] -= 1
+                issue_counts[line['to_status']] += 1
+                line = itr.next()
+
+            rows = [
+                {
+                    'day' : day.isoformat(),
+                    'status' : k,
+                    'count' : v
+                } for k,v in issue_counts.items() if k != None ]
+            for row in rows:
+                writer.writerow(row)
+
+            day += one_day
+
 def parse_args():
     parser = argparse.ArgumentParser(description = 'Create CSV files for issues from a dataset.')
     parser.add_argument('name', metavar = 'NAME', type = str, help = 'The name of the dataset to extract.')
@@ -133,6 +181,7 @@ def main():
 
     add_transitions_to_issues(issues)
 
+    write_issue_counts(args.basename or args.name, args.dir, issues)
     write_issues(args.basename or args.name, args.dir, issues)
     write_transitions(args.basename or args.name, args.dir, issues)
 
