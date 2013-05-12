@@ -1,0 +1,133 @@
+import argparse
+from iso8601 import parse_date as parse_iso
+from iso8601 import iso8601
+import datetime
+import os
+import codecs
+import csv
+from pymongo import MongoClient
+
+client = MongoClient()
+
+as_is_fields = {
+    'key': 'key',
+    'summary' : 'fields.summary',
+    'issue_type' : 'fields.issuetype.name',
+    'vote_count' : 'fields.votes.votes',
+    'resolution' : 'fields.resolution.name',
+    'resolutiondate' : 'fields.resolutiondate',
+    'reporter' : 'fields.reporter.name',
+    'updated' : 'fields.updated',
+    'created' : 'fields.created',
+    # 'description' : 'fields.description', # PROBLEMATIC IN CSV! Will contain new lines and such.
+    'priority' : 'fields.priority.name',
+    'watch_count' : 'fields.watches.watchCount',
+    'status' : 'fields.status.name',
+    'assignee' : 'fields.assignee.name',
+    'project' : 'fields.project.key',
+    'comment_count' : 'fields.comment.total'
+}
+
+def retrieve_dotnotation_field(input_dict, input_key):
+    return reduce(lambda d, k: d.get(k) if d else None, input_key.split("."), input_dict)
+
+def find_dataset(name):
+    dataset = client.jiraview.datasets.find_one({ 'name' : name })
+    if not dataset:
+        print 'Could not find dataset named %s' % args.name
+        sys.exit(1)
+
+    return dataset
+
+def get_issues(collection):
+    return [issue for issue in client.jiraview[collection].find()]
+
+def add_transitions_to_issues(issues):
+    for issue in issues:
+        # filter histories for changes that involve the status field
+        log = issue['changelog']['histories']
+        workflow_log = [ line for line in log if 'status' in [i['field'] for i in line['items']] ]
+
+        #remove non status related items from log
+        for line in workflow_log:
+            line['status_item'], = filter(lambda i: i['field'] == 'status', line['items'])
+
+        # Not sure if they come in sorted order
+        workflow_log.sort(key = lambda x: x['created'])
+
+        # Create a list from the from 'nothing' to Open transition and the rest of the transitions
+        transitions = [{
+            'transition' : 'Non-existent to Open',
+            'when' : retrieve_dotnotation_field(issue, 'fields.created'),
+            'who' : retrieve_dotnotation_field(issue, 'fields.reporter.name'),
+            'from_status' : None,
+            'to_status' : 'Open',
+            'days_in_from_status' : None
+        }] + [{
+            'transition' : '%s to %s' % (retrieve_dotnotation_field(line, 'status_item.fromString'), retrieve_dotnotation_field(line, 'status_item.toString')),
+            'when' : retrieve_dotnotation_field(line, 'created'),
+            'who' : retrieve_dotnotation_field(line, 'author.name'),
+            'from_status' : retrieve_dotnotation_field(line, 'status_item.fromString'),
+            'to_status' : retrieve_dotnotation_field(line, 'status_item.toString'),
+        }]
+
+        # Calculate days between transitions
+        for idx in xrange(1, len(transitions)):
+            transitions[idx]['days_in_from_status'] = (parse_iso(transitions[idx]['when']) - parse_iso(transitions[idx - 1]['when'])).total_seconds() / (24 * 3600)
+
+        issue['__transitions'] = transitions
+
+def issue_fields(issue):
+    result = {}
+
+    # Add basic fields
+    for field_name, dotted_field in as_is_fields.items():
+        result[field_name] = retrieve_dotnotation_field(issue, dotted_field)
+
+    # Calculate # of days in current status
+    result['days_in_current_status'] = (datetime.datetime.now(iso8601.Utc()) - parse_iso(issue['__transitions'][-1]['when'])).total_seconds() / (24 * 3600)
+
+    return result
+
+def write_issues(basename, dir, issues):
+    if len(issues) == 0:
+        return
+
+    with codecs.open(os.path.join(dir, basename + '-issues.csv'), 'w', 'utf-8') as csv_file:
+        writer = csv.DictWriter(csv_file, issue_fields(issues[0]).keys(), restval = 'NA', dialect = 'excel')
+        writer.writeheader()
+        for issue in issues:
+            writer.writerow(issue_fields(issue))
+
+
+def write_transitions(basename, dir, issues):
+    if len(issues) == 0:
+        return
+
+    with codecs.open(os.path.join(dir, basename + '-transitions.csv'), 'w', 'utf-8') as csv_file:
+        writer = csv.DictWriter(csv_file, issues[0]['__transitions'][0].keys(), restval = 'NA', dialect = 'excel')
+        writer.writeheader()
+        for issue in issues:
+            for transition in issue['__transitions']:
+                writer.writerow(transition)
+
+def parse_args():
+    parser = argparse.ArgumentParser(description = 'Create CSV files for issues from a dataset.')
+    parser.add_argument('name', metavar = 'NAME', type = str, help = 'The name of the dataset to extract.')
+    parser.add_argument('-basename', metavar = 'BASE_FILENAME', type = str, help = 'Base filename for the CSV files. The program will create two files: [basename]-issues.csv and [basename]-transitions.csv.')
+    parser.add_argument('-dir', metavar = 'OUTPUT_DIRECTORY', type = str, default = '.', help = 'Base filename for the CSV files. The program will create two files: [basename]-issues.csv and [basename]-transitions.csv.')
+
+    return parser.parse_args()
+
+def main():
+    args = parse_args()
+    dataset = find_dataset(args.name)
+    issues = get_issues(dataset['issue_collection'])
+
+    add_transitions_to_issues(issues)
+
+    write_issues(args.basename or args.name, args.dir, issues)
+    write_transitions(args.basename or args.name, args.dir, issues)
+
+if __name__ == '__main__':
+    main()
