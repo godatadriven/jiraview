@@ -16,3 +16,4 @@
         - reshape2
         - outliers
         - optparse
+        - plyr

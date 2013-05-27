@@ -7,7 +7,12 @@ import argparse
 from iso8601 import parse_date as parse_iso
 from pymongo import MongoClient
 
-client = MongoClient()
+client = None
+
+def create_client():
+    global client
+    if not client:
+        client = MongoClient()
 
 def log(verbose, s):
     if verbose:
@@ -70,6 +75,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Fetch the latest changes for a dataset.')
     parser.add_argument('name', metavar = 'NAME', type = str, help = 'The name of the dataset to fetch.')
     parser.add_argument('-verbose', '-v', dest = 'verbose', action = 'store_true', default = False, help = 'Show some output while work is being done.')
+    parser.add_argument('-fix', dest = 'fix', action = 'store_true', default = False, help = 'Fix a fetch operation that was interrupted mid-flight. Use after a dataset -reset. This will check the actual difference between the stored dataset in mongo and the remote jira dataset on a issue per issue basis en re-fetch everything that is not present locally or stale.')
     return parser.parse_args()
 
 def find_dataset(name):
@@ -80,19 +86,29 @@ def find_dataset(name):
 
     return dataset
 
+def fixed_list(collection, issues):
+    saved_issues = { issue['key'] : issue for issue in client.jiraview[collection].find() }
+    result = [issue for issue in issues if (not saved_issues.has_key(issue['key'])) or (saved_issues[issue['key']]['fields']['updated'] < issue['fields']['updated'])]
+    return result
+
 def main():
     args = parse_args()
+
+    create_client()
 
     dataset = find_dataset(args.name)
 
     last_update = dataset.get('last_update') or datetime.datetime(1981, 6, 9)
-    # subtract one day to be safe with greater than / equals stuff. Also, I don't know how well JIRA's multi timezone support works (or mine).
+    # substract one day to be safe with greater than / equals stuff. Also, I don't know how well JIRA's multi timezone support works (or mine).
     last_update -= datetime.timedelta(days = 1)
     jql = dataset['jql'].format(last_update = last_update.strftime('%Y-%m-%d'))
     log(args.verbose, 'Using JQL query: %s' % jql)
 
     issues = fetch_summaries(jql, dataset['jira_url'], user = dataset.get('jira_user'), password = dataset.get('jira_password'), verbose = args.verbose)
     log(args.verbose, 'Found %d issues.' % len(issues))
+
+    if args.fix:
+        issues = fixed_list(dataset['issue_collection'], issues)
 
     fetch_and_save_issues(issues, dataset['issue_collection'], user = dataset.get('jira_user'), password = dataset.get('jira_password'), verbose = args.verbose)
 

@@ -1,10 +1,21 @@
 from pymongo import MongoClient
 import argparse
+import sys
 
-client = MongoClient()
+client = None
+
+def create_client():
+    global client
+    if not client:
+        client = MongoClient()
 
 def save_dataset(name, jql = None, issue_collection = None, jira_url = None, jira_user = None, jira_password = None, reset = False):
     dataset = client.jiraview.datasets.find_one({ 'name' : name} ) or {}
+
+    if dataset == {} and (jql == None or jira_url == None or issue_collection == None):
+        print 'Dataset "%s" does not exist yet. Required to specify at least jql, collection and url for new dataset definitions.' % name
+        sys.exit(1)
+
     dataset['name'] = name
 
     if jql: dataset['jql'] = jql
@@ -34,6 +45,7 @@ def parse_args():
     return parser.parse_args()
 
 def main():
+    create_client()
     save_dataset(**vars(parse_args()))
 
 if __name__ == '__main__':

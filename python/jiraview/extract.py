@@ -7,7 +7,12 @@ import codecs
 import csv
 from pymongo import MongoClient
 
-client = MongoClient()
+client = None
+
+def create_client():
+    global client
+    if not client:
+        client = MongoClient()
 
 as_is_fields = {
     'key': 'key',
@@ -140,7 +145,7 @@ def write_issue_counts(basename, dir, issues):
         writer = csv.DictWriter(csv_file, ['day', 'status', 'count'], restval = 'NA', dialect = 'excel')
         writer.writeheader()
 
-        #TODO: prettify imperative garble, probably want to create a generator for the days
+        #TODO: prettify garble, probably want to create a generator for the days
         transitions, known_statuses = all_transitions_and_known_statuses(issues)
 
         issue_counts = { s : 0 for s in known_statuses }
@@ -169,13 +174,16 @@ def write_issue_counts(basename, dir, issues):
 def parse_args():
     parser = argparse.ArgumentParser(description = 'Create CSV files for issues from a dataset.')
     parser.add_argument('name', metavar = 'NAME', type = str, help = 'The name of the dataset to extract.')
-    parser.add_argument('-basename', metavar = 'BASE_FILENAME', type = str, help = 'Base filename for the CSV files. The program will create two files: [basename]-issues.csv and [basename]-transitions.csv.')
-    parser.add_argument('-dir', metavar = 'OUTPUT_DIRECTORY', type = str, default = '.', help = 'Base filename for the CSV files. The program will create two files: [basename]-issues.csv and [basename]-transitions.csv.')
+    parser.add_argument('-basename', metavar = 'BASE_FILENAME', type = str, help = 'Base filename for the CSV files. The program will create three files: [basename]-issues.csv, [basename]-transitions.csv and [basename]-daycounts.csv.')
+    parser.add_argument('-dir', metavar = 'OUTPUT_DIRECTORY', type = str, default = '.', help = 'Output directory.')
 
     return parser.parse_args()
 
 def main():
     args = parse_args()
+
+    create_client()
+
     dataset = find_dataset(args.name)
     issues = get_issues(dataset['issue_collection'])
 
