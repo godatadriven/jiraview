@@ -36,10 +36,10 @@ In your favorite shell, take these steps:
 	cd jiraview/python
 	
 	pip install -r requirements.txt
+	cd jiraview
 	
 	# Now we define a data set (for the Apache Wicket project)
 	# Note tha {last_update} placeholder in the JQL query. This is required for incremental fetching.
-	cd jiraview
 	python dataset.py wicket \
 	-jql 'project = Wicket and updatedDate > {last_update}' \
 	-url 'https://issues.apache.org/jira/' \
