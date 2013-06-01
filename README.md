@@ -50,7 +50,8 @@ In your favorite shell, take these steps:
 	# This will take a long time; if you run the fetch script again, it will do an incremental fetch
 	python fetch.py wicket -v
 	
-	# Create a bunch of CSV files from the issues (see the R sample script for usage; column names are reasonably descriptive)
+	# Create a bunch of CSV files from the issues
+	# (see the R sample script for usage; column names in CSV's are reasonably descriptive)
 	python extract.py wicket -dir /tmp
 	
 	# You can now use the CSVs for your JIRA data needs.
