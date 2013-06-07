@@ -1,11 +1,15 @@
+# -*- coding: utf-8 -*- #
+from __future__ import unicode_literals
+
 import argparse
 from iso8601 import parse_date as parse_iso
 from iso8601 import iso8601
 import datetime
 import os
-import codecs
 import csv
 from pymongo import MongoClient
+
+import jvutil as util
 
 client = None
 
@@ -100,9 +104,8 @@ def write_issues(basename, dir, issues):
     if len(issues) == 0:
         return
 
-    with codecs.open(os.path.join(dir, basename + '-issues.csv'), 'w', 'utf-8') as csv_file:
-        writer = csv.DictWriter(csv_file, issue_fields(issues[0]).keys(), restval = 'NA', dialect = 'excel')
-        writer.writeheader()
+    with open(os.path.join(dir, basename + '-issues.csv'), 'w') as csv_file:
+        writer = util.Utf8CsvDictWriter(csv_file, issue_fields(issues[0]).keys())
         for issue in issues:
             writer.writerow(issue_fields(issue))
 
@@ -111,12 +114,11 @@ def write_transitions(basename, dir, issues):
     if len(issues) == 0:
         return
 
-    with codecs.open(os.path.join(dir, basename + '-transitions.csv'), 'w', 'utf-8') as csv_file:
+    with open(os.path.join(dir, basename + '-transitions.csv'), 'w') as csv_file:
         row = issue_fields(issues[0])
         row.update(issues[0]['__transitions'][0])
 
-        writer = csv.DictWriter(csv_file, row.keys(), restval = 'NA', dialect = 'excel')
-        writer.writeheader()
+        writer = util.Utf8CsvDictWriter(csv_file, row.keys())
         for issue in issues:
             row = issue_fields(issue)
             for transition in issue['__transitions']:
@@ -141,9 +143,8 @@ def write_issue_counts(basename, dir, issues):
     if len(issues) == 0:
         return
 
-    with codecs.open(os.path.join(dir, basename + '-daycounts.csv'), 'w', 'utf-8') as csv_file:
-        writer = csv.DictWriter(csv_file, ['day', 'status', 'count'], restval = 'NA', dialect = 'excel')
-        writer.writeheader()
+    with open(os.path.join(dir, basename + '-daycounts.csv'), 'w') as csv_file:
+        writer = util.Utf8CsvDictWriter(csv_file, ['day', 'status', 'count'])
 
         #TODO: prettify garble, probably want to create a generator for the days
         transitions, known_statuses = all_transitions_and_known_statuses(issues)
@@ -189,8 +190,8 @@ def main():
 
     add_transitions_to_issues(issues)
 
-    write_issue_counts(args.basename or args.name, args.dir, issues)
     write_issues(args.basename or args.name, args.dir, issues)
+    write_issue_counts(args.basename or args.name, args.dir, issues)
     write_transitions(args.basename or args.name, args.dir, issues)
 
 if __name__ == '__main__':
