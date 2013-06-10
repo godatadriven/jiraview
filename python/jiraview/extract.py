@@ -89,27 +89,36 @@ def add_transitions_to_issues(issues):
         issue['__transitions'] = transitions
 
 def add_user_transitions_to_issues(issues, user_transitions):
-    all_from_statuses = [ user_transition.split('-')[0].lower() for user_transition in user_transitions.values() ]
-    all_to_statuses = [ user_transition.split('-')[1].lower() for user_transition in user_transitions.values() ]
+    all_from_statuses = [ user_transition.split(',')[0].lower() for user_transition in user_transitions.values() ]
+    all_to_statuses = [ user_transition.split(',')[1].lower() for user_transition in user_transitions.values() ]
 
     for issue in issues:
         from_status_times = {}
         to_status_times = {}
         # Register only the first change to from status and always the last change to to status
         for transition in issue['__transitions']:
-            status = transition['to_status'].lower().replace(' ', '')
+            status = '+' + transition['to_status'].lower().replace(' ', '')
             if not status in from_status_times and status in all_from_statuses:
                 from_status_times[status] = transition['when']
             if status in all_to_statuses:
                 to_status_times[status] = transition['when']
 
+            if transition['from_status']:
+                status = '-' + transition['from_status'].lower().replace(' ', '')
+                if not status in from_status_times and status in all_from_statuses:
+                    from_status_times[status] = transition['when']
+                if status in all_to_statuses:
+                    to_status_times[status] = transition['when']
+
         result = {}
         for user_transition_key, user_transition_value in user_transitions.items():
-            from_status = user_transition_value.split('-')[0].lower()
-            to_status = user_transition_value.split('-')[1].lower()
+            from_status = user_transition_value.split(',')[0].lower()
+            to_status = user_transition_value.split(',')[1].lower()
             result[user_transition_key] = (parse_iso(to_status_times[to_status]) - parse_iso(from_status_times[from_status])).total_seconds() / (24 * 3600) if (from_status in from_status_times) and (to_status in to_status_times) else 'NA'
-            result['first_time_in_' + from_status] = from_status_times[from_status] if from_status in from_status_times else 'NA'
-            result['last_time_in_' + to_status] = to_status_times[to_status] if to_status in to_status_times else 'NA'
+            from_status_field_name = 'first_time_' + ('into_' if from_status[0] == '+' else 'out_of_') + from_status[1:]
+            to_status_field_name = 'last_time_' + ('into_' if to_status[0] == '+' else 'out_of_') + to_status[1:]
+            result[from_status_field_name] = from_status_times[from_status] if from_status in from_status_times else 'NA'
+            result[to_status_field_name] = to_status_times[to_status] if to_status in to_status_times else 'NA'
 
         issue['__user_transitions'] = result
 
