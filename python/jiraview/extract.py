@@ -108,6 +108,8 @@ def add_user_transitions_to_issues(issues, user_transitions):
             from_status = user_transition_value.split('-')[0].lower()
             to_status = user_transition_value.split('-')[1].lower()
             result[user_transition_key] = (parse_iso(to_status_times[to_status]) - parse_iso(from_status_times[from_status])).total_seconds() / (24 * 3600) if (from_status in from_status_times) and (to_status in to_status_times) else 'NA'
+            result['first_time_in_' + from_status] = from_status_times[from_status] if from_status in from_status_times else 'NA'
+            result['last_time_in_' + to_status] = to_status_times[to_status] if to_status in to_status_times else 'NA'
 
         issue['__user_transitions'] = result
 
