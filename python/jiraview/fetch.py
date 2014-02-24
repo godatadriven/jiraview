@@ -1,4 +1,5 @@
 import requests
+from requests.adapters import HTTPAdapter
 import json
 import urlparse
 import sys
@@ -18,7 +19,7 @@ def log(verbose, s):
     if verbose:
         print s
 
-def fetch_summaries(jql, jira_url, user = None, password = None, verbose = False):
+def fetch_summaries(session, jql, jira_url, verbose = False):
     search_url = urlparse.urljoin(jira_url + '/' if not jira_url.endswith('/') else jira_url, 'rest/api/2/search')
 
     count = 0
@@ -32,10 +33,10 @@ def fetch_summaries(jql, jira_url, user = None, password = None, verbose = False
             'startAt' : count
         }
 
-        if (user and password):
-            search_request = requests.get(search_url, params = search_params, auth = (user, password))
-        else:
-            search_request = requests.get(search_url, params = search_params)
+        # if (user and password):
+            # search_request = requests.get(search_url, params = search_params, auth = (user, password))
+        # else:
+        search_request = session.get(search_url, params = search_params)
 
         log(verbose, 'Requesting %s.' % search_url)
 
@@ -48,7 +49,7 @@ def fetch_summaries(jql, jira_url, user = None, password = None, verbose = False
 
     return result
 
-def fetch_and_save_issues(issues, collection, user = None, password = None, verbose = False):
+def fetch_and_save_issues(session, issues, collection, verbose = False):
     count = 0
     for link in issues:
         params = {
@@ -56,10 +57,10 @@ def fetch_and_save_issues(issues, collection, user = None, password = None, verb
             'fields' : '*all'
         }
 
-        if (user and password):
-            issue_request = requests.get(link['self'], params = params, auth = (user, password))
-        else:
-            issue_request = requests.get(link['self'], params = params)
+        # if (user and password):
+            # issue_request = requests.get(link['self'], params = params, auth = (user, password))
+        # else:
+        issue_request = session.get(link['self'], params = params)
 
         log(verbose, '[%d / %d] Requesting %s.' % (count + 1, len(issues), link['self']))
 
@@ -104,13 +105,20 @@ def main():
     jql = dataset['jql'].format(last_update = last_update.strftime('%Y-%m-%d'))
     log(args.verbose, 'Using JQL query: %s' % jql)
 
-    issues = fetch_summaries(jql, dataset['jira_url'], user = dataset.get('jira_user'), password = dataset.get('jira_password'), verbose = args.verbose)
+    user = dataset.get('jira_user')
+    password = dataset.get('jira_password')
+    session = requests.Session()
+    session.mount(dataset['jira_url'], HTTPAdapter(max_retries=10))
+    if (user and password):
+        session.auth = (user, password)
+
+    issues = fetch_summaries(session, jql, dataset['jira_url'], verbose = args.verbose)
     log(args.verbose, 'Found %d issues.' % len(issues))
 
     if args.fix:
         issues = fixed_list(dataset['issue_collection'], issues)
 
-    fetch_and_save_issues(issues, dataset['issue_collection'], user = dataset.get('jira_user'), password = dataset.get('jira_password'), verbose = args.verbose)
+    fetch_and_save_issues(session, issues, dataset['issue_collection'], verbose = args.verbose)
 
     dataset['last_update'] = most_recent_update(issues)
     client.jiraview.datasets.save(dataset)
