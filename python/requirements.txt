@@ -1,4 +1,4 @@
 iso8601==0.1.4
 pymongo==2.5
-requests==1.2.0
+requests==1.2.3
 wsgiref==0.1.2
